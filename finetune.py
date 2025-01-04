@@ -34,6 +34,9 @@ from trl import (
 
 from transformers import DataCollatorForLanguageModeling, set_seed
 
+import warnings
+warnings.filterwarnings("ignore")
+
 def to_linux_path(path):
     """Convert a given path to Linux-style with forward slashes."""
     return path.replace("\\", "/")
@@ -123,17 +126,22 @@ def main():
     data_args = cfg.prepare_data
     model_args = train_args.model_args
 
-    
-    # Get the path to the processed data
-    processed_data_path = os.path.normpath(data_args.dataset.output_path)
-    
-    # Check if the processed data exists
-    if not os.path.isfile(processed_data_path):
-        raise FileNotFoundError(f"Processed data not found at: {processed_data_path}")
-    
-    # Load the dataset
-    logger.info("LOADING PROCESSED DATASESS...")
-    dataset = joblib.load(processed_data_path)
+    if data_args.dataset.is_prepared:
+        # Get the path to the processed data
+        processed_data_path = os.path.normpath(data_args.dataset.output_path)
+        
+        # Check if the processed data exists
+        if not os.path.isfile(processed_data_path):
+            raise FileNotFoundError(f"Processed data not found at: {processed_data_path}")
+        
+        # Load the dataset
+        logger.info("LOADING PROCESSED DATASET...")
+        dataset = joblib.load(processed_data_path)
+    else:
+        # Prepare dataset
+        logger.info("PREPARING DATASET...")
+        from prepare_data import prepare_data
+        dataset = prepare_data(exp_args, data_args, model_args)
 
     # print(dataset)
     
@@ -262,8 +270,11 @@ def main():
     # Initialize our Trainer
     logger.info("Instantiating Trainer")
     # print("Instantiating Trainer")
-    
-    train_ds, val_ds, test_ds = dataset['train'], dataset['val'], dataset['test']
+    if data_args.dataset.do_split:
+        train_ds, val_ds, test_ds = dataset['train'], dataset['val'], dataset['test']
+    else:
+        train_ds = dataset['train']
+        val_ds = test_ds = train_ds
     trainer = SFTTrainer(
         model=model,
         args=training_args,
@@ -293,11 +304,11 @@ def main():
 
     all_metrics = {"run_name": wandb.run.name}
 
-    # Check for last checkpoint
-    from src.utils.model_utils import get_checkpoint
-    last_checkpoint = get_checkpoint(training_args)
-    if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
-        logger.info(f"Checkpoint detected, resuming training at {last_checkpoint=}.")
+    # # Check for last checkpoint
+    # from src.utils.model_utils import get_checkpoint
+    # last_checkpoint = get_checkpoint(training_args)
+    # if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+    #     logger.info(f"Checkpoint detected, resuming training at {last_checkpoint=}.")
 
     #  TRAINING
     if training_args.do_train:
@@ -305,9 +316,11 @@ def main():
 
         if training_args.resume_from_checkpoint:
             checkpoint = training_args.resume_from_checkpoint
-        elif last_checkpoint:
-            checkpoint = last_checkpoint
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        # elif last_checkpoint:
+        #     checkpoint = last_checkpoint
+            train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        else:
+            train_result = trainer.train()
 
         metrics = train_result.metrics
         trainer.log_metrics("train", metrics)
@@ -340,7 +353,7 @@ def main():
     import json
     
     if (training_args.do_train or training_args.do_eval or training_args.do_predict):
-            with open(os.path.join(results_dir, "metrics.json"), "a") as fout:
+            with open(os.path.join(results_dir, "metrics.json"), "w") as fout:
                 fout.write(json.dumps(all_metrics))
 
     logger.info("TRAINING COMPLETED.")

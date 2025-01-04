@@ -7,6 +7,8 @@ import yaml
 from typing import Tuple
 import logging
 
+from functools import partial
+
 from src.utils.utils import load_args, update_yaml
 from src.utils.model_utils import load_tokenizer
 
@@ -243,7 +245,36 @@ def get_data_collator():
 
 #     print("Data processing complete. Output saved to 'processed_data.txt'.")
 
+def prepare_data(exp_args, data_args, model_args):
 
+    dataset_dict = create_dataset_dict(data_args.dataset.data_path, 
+                                       data_args.dataset.do_split, 
+                                       data_args.dataset.val_ratio, 
+                                       data_args.dataset.test_ratio, 
+                                       exp_args.exp_manager.seed)
+    
+    tokenizer = load_tokenizer(data_args, model_args)
+
+    _create_prompt_formats = partial(
+        create_prompt_formats,
+          tokenizer = tokenizer,
+          use_model_chat_template = data_args.prompt.use_model_chat_template,
+          instruction_key = "### Instruction:",
+          instruction_text = "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
+          input_key = "### Question:",
+          response_key = "### Answer:",
+          end_key = data_args.prompt.end_key,
+          do_tokenize = data_args.tokenizer.do_tokenize, 
+          max_length = data_args.tokenizer.max_length
+    )
+
+    dataset = dataset_dict.map(
+        _create_prompt_formats, 
+         batched=False, 
+         remove_columns=dataset_dict['train'].column_names
+    )
+
+    return dataset
 
 if __name__ == "__main__":
     # Load parameters from params.yaml
@@ -280,7 +311,7 @@ if __name__ == "__main__":
     dataset_dict = create_dataset_dict(data_args.dataset.data_path, 
                                        data_args.dataset.do_split, 
                                        data_args.dataset.val_ratio, 
-                                       data_args.dataset.val_ratio, 
+                                       data_args.dataset.test_ratio, 
                                        exp_args.exp_manager.seed)
 
     # show_dataset_examples(dataset_dict)
@@ -291,7 +322,7 @@ if __name__ == "__main__":
     tokenizer = load_tokenizer(data_args, model_args)
 
 
-    from functools import partial
+    # from functools import partial
 
     _create_prompt_formats = partial(
         create_prompt_formats,
