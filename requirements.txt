@@ -1,0 +1,10 @@
+datasets
+accelerate==1.2.1
+peft
+trl
+bitsandbytes
+# git+https://github.com/huggingface/transformers
+wandb
+omegaconf
+pyyaml
+hydra-core

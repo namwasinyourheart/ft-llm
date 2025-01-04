@@ -1,0 +1,13 @@
+exp_manager:
+    seed: 202412
+    exps_dir: './exps'
+    exp_name: "it__qwen2.5-0.5b-instruct__cmc_global_qa_480"
+    prepare_data_cfg_path: "configs/prepare_data.yaml"
+    train_cfg_path: "configs/train.yaml"
+    task_name:
+    model_name:
+    dataset_name:
+
+wandb:
+  use_wandb: true
+  project: llm_ft_ask_cmc_global

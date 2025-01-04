@@ -1,0 +1,26 @@
+# exp_name: "it__qwen2.5-0.5b-instruct__cmc_global_qa_480"
+# seed: 202412
+dataset:
+    data_path: "E:/projects/ask-aimesoft/notebooks/draft/list_qa_results_20241209_024009_fixed_row8_list_type.csv" #/kaggle/input/ask-cmc-global-480/list_qa_results_20241209_024009_fixed_row8_list_type.csv"
+    do_split: True
+    val_ratio: 0.25
+    test_ratio: 0.2
+    output_path:
+
+prompt:
+    use_model_chat_template: False  # Whether to use the standard chat/instruct template of the model
+    instruction_key: "### Instruction:"
+    instruction_text: "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company."
+    input_key: "### Question:"
+    response_key: "### Answer:"
+    end_key:
+
+tokenizer:
+    model_name_or_path:  "Qwen/Qwen2.5-0.5B-Instruct" # "google/gemma-2-2b-it" #"Qwen/Qwen2.5-0.5B-Instruct"
+    # padding_size: 'right'
+    new_pad_token: 
+    do_tokenize: True
+    truncation: True
+    padding: 'max_length'
+    add_special_tokens: True
+    max_length: 128 # If None, set max_length to tokenizer.model_max_length
