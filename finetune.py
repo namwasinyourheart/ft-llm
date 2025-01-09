@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 from src.utils.model_utils import get_model_tokenizer, get_peft_config
 from src.utils.log_utils import init_logging, setup_logger
+from src.utils.exp_utils import create_exp_dir
 
 from peft import (
     LoraConfig, 
@@ -64,67 +65,61 @@ def main():
     setup_environment()
 
 
-
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Process experiment configurations.')
     parser.add_argument(
-        '--exp_name',
+        '--config_path',
         type=str,
-        help='Name of the experiment. This will determine the configuration file path.'
+        required=True,
+        help='Path to the configuration file for the experiment.'
     )
-    
+
     # args = parser.parse_args()
     args, override_args = parser.parse_known_args()  # Capture any extra positional arguments (overrides)
 
     logger.info("LOADING CONFIGS...")
 
-    exp_dir = os.path.join('exps', args.exp_name)
+    # Normalize the provided config path
+    config_path = os.path.normpath(args.config_path)  # Normalize path for the current OS
 
-    config_dir = os.path.join(exp_dir, 'configs')
-    config_fn = 'exp'
+    # Check if the configuration file exists
+    if not os.path.isfile(config_path):
+        raise FileNotFoundError(f"Configuration file not found at: {config_path}")
+
+    # Extract directory and filename from the provided config path
+    config_dir = os.path.dirname(config_path)
+    config_fn = os.path.splitext(os.path.basename(config_path))[0]
+
+    # print(config_dir)
+    # print(config_fn)
 
     try:
         with initialize(version_base=None, config_path=config_dir):
             # Compose the configuration with optional overrides
             cfg = compose(config_name=config_fn, overrides=override_args)
-            # cfg = OmegaConf.to_container(cfg, resolve=True)
     except Exception as e:
-        raise RuntimeError(f"Failed to load configuration for {exp_dir}: {e}")
-    
-    # print("cfg:", cfg)
+        raise RuntimeError(f"Failed to load configuration from {config_path}: {e}")
 
-    print("type(cfg):", type(cfg))
+    # Print the configuration for debugging
+    # print("type(cfg):", type(cfg))
     print(OmegaConf.to_yaml(cfg))
-    
-    
-    # Construct the path to the experiment config file
-    exp_cfg_path = os.path.join(args.exp_name, 'configs', 'exp.yaml')
-    exp_cfg_path = os.path.join('exps', exp_cfg_path)
-    exp_cfg_path = os.path.normpath(exp_cfg_path)  # Normalize path for the current OS
-    
-    # Check if the experiment config file exists
-    if not os.path.isfile(exp_cfg_path):
-        raise FileNotFoundError(f"Experiment configuration file not found at: {exp_cfg_path}")
-    
-    # Load experiment arguments
-    # exp_args = load_args(exp_cfg_path, verbose=True)
-    exp_args = cfg
-    
-    # # Extract paths from experiment arguments
-    # data_cfg_path = os.path.join(exp_dir, exp_args.exp_manager.prepare_data_cfg_path)
-    # data_cfg_path = os.path.normpath(data_cfg_path)
 
-    # train_cfg_path = os.path.join(exp_dir, exp_args.exp_manager.train_cfg_path)
-    # train_cfg_path = os.path.normpath(train_cfg_path)
+    assert os.path.basename(config_path).replace('.yaml', '') == cfg.exp_manager.exp_name
     
-    # # Load training and data arguments
-    # train_args = load_args(to_linux_path(train_cfg_path), verbose=True)
-    # data_args = load_args(to_linux_path(data_cfg_path),verbose=True)
-    # model_args = train_args.model_args
+    logger.info("CREATING EXP DIR...")
+    
+    exp_name = cfg.exp_manager.exp_name
+    # create_exp_dir(os.path.basename(config_path).replace('.yaml', ''))
+    exp_dir, configs_dir, data_dir, checkpoints_dir, results_dir  = create_exp_dir(exp_name)
 
+    import shutil
+    shutil.copy(config_path, configs_dir)
+
+    exp_args = cfg.exp_manager
     train_args = cfg.train
     data_args = cfg.prepare_data
-    model_args = train_args.model_args
+    model_args = cfg.prepare_model
+
 
     if data_args.dataset.is_prepared:
         # Get the path to the processed data
@@ -141,7 +136,7 @@ def main():
         # Prepare dataset
         logger.info("PREPARING DATASET...")
         from prepare_data import prepare_data
-        dataset = prepare_data(exp_args, data_args, model_args)
+        dataset, processed_data_path = prepare_data(exp_args, data_args, model_args)
 
     # print(dataset)
     
@@ -149,7 +144,7 @@ def main():
     show_dataset_examples(dataset)
 
     # Set seed before initializing model.
-    set_seed(exp_args.exp_manager.seed)
+    set_seed(exp_args.seed)
 
     # LOADING MODEL
     logger.info("LOADING MODEL AND TOKENIZER...")
@@ -245,13 +240,14 @@ def main():
 
     # if exp_args.wandb.use_wandb:
     wandb.init(
-        project=exp_args.wandb.project
+        project=cfg.exp_manager.wandb.project,
+        name = cfg.exp_manager.exp_name
     )
 
     current_date = time.strftime("%Y%m%d_%H%M%S")
-    checkpoints_dir = os.path.join(exp_dir, 'checkpoints')
-    results_dir = os.path.join(exp_dir, 'results')
-    os.makedirs(results_dir, exist_ok=True)
+    # checkpoints_dir = os.path.join(exp_dir, 'checkpoints')
+    # results_dir = os.path.join(exp_dir, 'results')
+    # os.makedirs(results_dir, exist_ok=True)
     
     training_args = instantiate(train_args.train_args, 
                                 output_dir=checkpoints_dir, 
@@ -301,6 +297,7 @@ def main():
 
     # Add the callback to the trainer
     trainer.add_callback(progress_callback)
+    logger.info('trainer_callback_list: %s', trainer.callback_handler.callbacks)
 
     all_metrics = {"run_name": wandb.run.name}
 
@@ -337,8 +334,8 @@ def main():
 
         # Save model
         logger.info("SAVING MODEL...")
-        trainer.model.save_pretrained(training_args.output_dir)
-        logger.info(f"Model saved to {training_args.output_dir}")
+        trainer.model.save_pretrained(os.path.join(results_dir, 'adapter'))
+        logger.info(f"Model saved to {os.path.join(results_dir, 'adapter')}")
 
     import pandas as pd
     # PREDICTION
@@ -357,5 +354,46 @@ def main():
                 fout.write(json.dumps(all_metrics))
 
     logger.info("TRAINING COMPLETED.")
+
+    # Merge model
+    if model_args.do_merge == True:
+        logger.info("MERGING MODEL...")
+        # adapter_dir = os.path.join(exp_dir, 'results')
+        # os.makedirs(adapter_dir, exist_ok=True)
+
+
+        adapter_path = os.path.join(results_dir, 'adapter')
+        base_model, tokenizer = get_model_tokenizer(data_args, model_args, use_cpu=True)
+
+        from peft import PeftModel
+        finetuned_model = PeftModel.from_pretrained(base_model, adapter_path)
+        finetuned_model = finetuned_model.merge_and_unload()
+        
+        # Save merged model
+        finetuned_model.save_pretrained(os.path.join(results_dir, 'finetuned_model'))
+
+
+        # Save tokenizer
+        tokenizer.save_pretrained(os.path.join(results_dir, 'tokenizer'))
+
+    
+    # Log exp artifact
+    if exp_args.wandb.log_artifact == True:
+        logger.info("LOGGING EXP ARTIFACTS...")
+        # Create an artifact
+        artifact = wandb.Artifact(
+            name=exp_args.exp_name, 
+            type="exp", 
+            # description="Dummy dataset with CSV files"
+        )
+
+        # Add the directory to the artifact
+        artifact.add_dir(exp_dir)
+
+        wandb.log_artifact(artifact)
+
+    # Finish the W&B run
+    wandb.finish()
+
 if __name__ == '__main__':
     main()

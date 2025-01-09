@@ -7,3 +7,8 @@ __pycache__
 wandb
 
 exps
+
+*copy.py
+dummy_dataset
+
+notebooks

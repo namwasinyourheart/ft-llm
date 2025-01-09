@@ -251,7 +251,7 @@ def prepare_data(exp_args, data_args, model_args):
                                        data_args.dataset.do_split, 
                                        data_args.dataset.val_ratio, 
                                        data_args.dataset.test_ratio, 
-                                       exp_args.exp_manager.seed)
+                                       exp_args.seed)
     
     tokenizer = load_tokenizer(data_args, model_args)
 
@@ -259,10 +259,10 @@ def prepare_data(exp_args, data_args, model_args):
         create_prompt_formats,
           tokenizer = tokenizer,
           use_model_chat_template = data_args.prompt.use_model_chat_template,
-          instruction_key = "### Instruction:",
-          instruction_text = "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
-          input_key = "### Question:",
-          response_key = "### Answer:",
+          instruction_key = data_args.prompt.instruction_key, # "### Instruction:",
+          instruction_text = data_args.prompt.instruction_text, # "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
+          input_key = data_args.prompt.input_key, #"### Question:",
+          response_key = data_args.prompt.response_key, #"### Answer:",
           end_key = data_args.prompt.end_key,
           do_tokenize = data_args.tokenizer.do_tokenize, 
           max_length = data_args.tokenizer.max_length
@@ -274,7 +274,11 @@ def prepare_data(exp_args, data_args, model_args):
          remove_columns=dataset_dict['train'].column_names
     )
 
-    return dataset
+    if data_args.dataset.do_save:
+        save_path = data_args.dataset.prepared_data_path
+        save_dataset(dataset, save_path)
+
+    return dataset, save_path
 
 if __name__ == "__main__":
     # Load parameters from params.yaml

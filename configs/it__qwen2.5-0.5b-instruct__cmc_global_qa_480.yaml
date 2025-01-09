@@ -1,0 +1,89 @@
+exp_manager:
+  seed: 202412
+  exps_dir: './exps'
+  exp_name: "it__qwen2.5-0.5b-instruct__cmc_global_qa_480"
+  prepare_data_cfg_path: "configs/prepare_data.yaml"
+  train_cfg_path: "configs/train.yaml"
+  task_name:
+  model_name:
+  dataset_name:
+
+  wandb:
+    use_wandb: true
+    project: llm_ft_ask_cmc_global
+    log_artifact: true
+    artifact_types: ['exp', 'data', 'configs', 'results', 'checkpoints']
+
+
+prepare_data:
+  dataset:
+    is_prepared: false
+    data_path: E:/projects/ask-aimesoft/notebooks/draft/list_qa_results_20241209_024009_fixed_row8_list_type.csv
+    do_split: true
+    val_ratio: 0.25
+    test_ratio: 0.2
+    do_save: true
+    # prepared_data_path:
+    prepared_data_path: ./exps/it__qwen2.5-0.5b-instruct__cmc_global_qa_480/data/it__qwen2.5-0.5b-instruct__cmc_global_qa_480.pkl
+  prompt:
+    use_model_chat_template: false
+    instruction_key: '### Instruction:'
+    instruction_text: You are a knowledgeable assistant for the company CMC Global.
+      Your task is to providing accurate and helpful answers to the user's questions
+      about the company.
+    input_key: '### Question:'
+    response_key: '### Answer:'
+    end_key: null
+  tokenizer:
+    model_name_or_path: Qwen/Qwen2.5-0.5B-Instruct
+    new_pad_token: null
+    do_tokenize: true
+    truncation: true
+    padding: max_length
+    add_special_tokens: true
+    max_length: 128
+
+
+prepare_model: 
+  # _convert_: all
+  pretrained_model_name_or_path: "Qwen/Qwen2.5-0.5B-Instruct"
+  load_in_4bit: true
+  load_in_8bit: false
+  bnb_4bit_compute_dtype: 
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: false
+  bnb_4bit_quant_storage: "uint8"
+
+  use_peft: True
+  lora:
+    r: 64
+    lora_alpha: 32
+    lora_dropout: 0.0
+    bias: none
+    task_type: CAUSAL_LM
+    inference_mode: false
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    modules_to_save:
+
+  do_merge: false
+
+train:
+  train_args:
+    _target_: transformers.TrainingArguments
+    resume_from_checkpoint: 
+    do_train: true
+    do_eval: true
+    do_predict: true
+    learning_rate: 0.0001
+    # num_train_epochs: 1
+    max_steps: 1
+    per_device_train_batch_size: 2
+    per_device_eval_batch_size: 2
+    logging_steps: 1
+    logging_first_step: true
+    save_strategy: epoch
+    eval_strategy: epoch
+    eval_on_start: true
+
+
+# generate:

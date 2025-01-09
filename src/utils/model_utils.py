@@ -13,11 +13,19 @@ def load_tokenizer(data_args, model_args,
     if not tokenizer.pad_token:
         if data_args.new_pad_token:
             tokenizer.padding_side = 'left'
-            tokenizer.pad_token = data_args.new_pad_token,
-            tokenizer.add_special_tokens({"pad_token": data_args.new_pad_token})
+            tokenizer.pad_token = data_args.tokenizer.new_pad_token,
+            tokenizer.add_special_tokens({"pad_token": data_args.tokenizer.new_pad_token})
         else:
             tokenizer.padding_side = 'right'
             tokenizer.pad_token = tokenizer.eos_token
+
+    tokenizer.add_special_tokens({
+        "additional_special_tokens": [
+            data_args.prompt.instruction_key, 
+            data_args.prompt.input_key, 
+            data_args.prompt.response_key
+        ]
+    })
             
     return tokenizer
 
