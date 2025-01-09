@@ -370,11 +370,11 @@ def main():
         finetuned_model = finetuned_model.merge_and_unload()
         
         # Save merged model
-        finetuned_model.save_pretrained(os.path.join(results_dir, 'finetuned_model'))
+        finetuned_model.save_pretrained(os.path.join(results_dir, 'finetuned_model_tokenizer'))
 
 
         # Save tokenizer
-        tokenizer.save_pretrained(os.path.join(results_dir, 'tokenizer'))
+        tokenizer.save_pretrained(os.path.join(results_dir, 'finetuned_model_tokenizer'))
 
     
     # Log exp artifact

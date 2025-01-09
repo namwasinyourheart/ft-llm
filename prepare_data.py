@@ -280,83 +280,83 @@ def prepare_data(exp_args, data_args, model_args):
 
     return dataset, save_path
 
-if __name__ == "__main__":
-    # Load parameters from params.yaml
-    exp_args = load_args('configs/exp.yaml')
+# if __name__ == "__main__":
+#     # Load parameters from params.yaml
+#     exp_args = load_args('configs/exp.yaml')
 
-    data_cfg_path = exp_args.exp_manager.prepare_data_cfg_path
-    data_args = load_args(data_cfg_path)
+#     data_cfg_path = exp_args.exp_manager.prepare_data_cfg_path
+#     data_args = load_args(data_cfg_path)
 
-    train_cfg_path = exp_args.exp_manager.train_cfg_path
-    train_args = load_args(train_cfg_path)
+#     train_cfg_path = exp_args.exp_manager.train_cfg_path
+#     train_args = load_args(train_cfg_path)
 
-    model_args = train_args.model_args
+#     model_args = train_args.model_args
     
 
-    exps_dir = exp_args.exp_manager.exps_dir
-    exp_name = exp_args.exp_manager.exp_name
-    os.makedirs(exps_dir, exist_ok=True)
+#     exps_dir = exp_args.exp_manager.exps_dir
+#     exp_name = exp_args.exp_manager.exp_name
+#     os.makedirs(exps_dir, exist_ok=True)
 
-    exp_dir = os.path.join(exps_dir, exp_name)
-    os.makedirs(exp_dir, exist_ok=True)
+#     exp_dir = os.path.join(exps_dir, exp_name)
+#     os.makedirs(exp_dir, exist_ok=True)
 
-    exp_config_dir = os.path.join(exp_dir, 'configs')
-    os.makedirs(exp_config_dir, exist_ok=True)
+#     exp_config_dir = os.path.join(exp_dir, 'configs')
+#     os.makedirs(exp_config_dir, exist_ok=True)
 
-    shutil.copy('configs/exp.yaml', exp_config_dir)
-    shutil.copy('configs/train.yaml', exp_config_dir)
-    shutil.copy(data_cfg_path, exp_config_dir)
+#     shutil.copy('configs/exp.yaml', exp_config_dir)
+#     shutil.copy('configs/train.yaml', exp_config_dir)
+#     shutil.copy(data_cfg_path, exp_config_dir)
 
-    # shutil.copytree('./configs', exp_config_dir)
+#     # shutil.copytree('./configs', exp_config_dir)
 
-    data_dir = os.path.join(exp_dir, 'data')
-    os.makedirs(data_dir, exist_ok=True)
+#     data_dir = os.path.join(exp_dir, 'data')
+#     os.makedirs(data_dir, exist_ok=True)
 
-    dataset_dict = create_dataset_dict(data_args.dataset.data_path, 
-                                       data_args.dataset.do_split, 
-                                       data_args.dataset.val_ratio, 
-                                       data_args.dataset.test_ratio, 
-                                       exp_args.exp_manager.seed)
+#     dataset_dict = create_dataset_dict(data_args.dataset.data_path, 
+#                                        data_args.dataset.do_split, 
+#                                        data_args.dataset.val_ratio, 
+#                                        data_args.dataset.test_ratio, 
+#                                        exp_args.exp_manager.seed)
 
-    # show_dataset_examples(dataset_dict)
+#     # show_dataset_examples(dataset_dict)
 
-    # from utils import load_tokenizer
-    # tokenizer = load_tokenizer(data_args.tokenizer.model_name_or_path)
-    logging.info("Loading tokenizer...")
-    tokenizer = load_tokenizer(data_args, model_args)
+#     # from utils import load_tokenizer
+#     # tokenizer = load_tokenizer(data_args.tokenizer.model_name_or_path)
+#     logging.info("Loading tokenizer...")
+#     tokenizer = load_tokenizer(data_args, model_args)
 
 
-    # from functools import partial
+#     # from functools import partial
 
-    _create_prompt_formats = partial(
-        create_prompt_formats,
-          tokenizer = tokenizer,
-          use_model_chat_template = data_args.prompt.use_model_chat_template,
-          instruction_key = "### Instruction:",
-          instruction_text = "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
-          input_key = "### Question:",
-          response_key = "### Answer:",
-          end_key = data_args.prompt.end_key,
-          do_tokenize = data_args.tokenizer.do_tokenize, 
-          max_length = data_args.tokenizer.max_length
-    )
-    # if params.tokenizer.do_tokenize:
-    dataset = dataset_dict.map(
-        _create_prompt_formats, 
-         batched=False, 
-         remove_columns=dataset_dict['train'].column_names
-    )
-    output_path = data_args.dataset.output_path
-    if not output_path:
-        save_path =  os.path.join(data_dir, f'{exp_name}.pkl')
-        update_yaml(os.path.join(exp_config_dir, os.path.basename(data_cfg_path)), 'dataset.output_path', save_path)
+#     _create_prompt_formats = partial(
+#         create_prompt_formats,
+#           tokenizer = tokenizer,
+#           use_model_chat_template = data_args.prompt.use_model_chat_template,
+#           instruction_key = "### Instruction:",
+#           instruction_text = "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
+#           input_key = "### Question:",
+#           response_key = "### Answer:",
+#           end_key = data_args.prompt.end_key,
+#           do_tokenize = data_args.tokenizer.do_tokenize, 
+#           max_length = data_args.tokenizer.max_length
+#     )
+#     # if params.tokenizer.do_tokenize:
+#     dataset = dataset_dict.map(
+#         _create_prompt_formats, 
+#          batched=False, 
+#          remove_columns=dataset_dict['train'].column_names
+#     )
+#     output_path = data_args.dataset.prepared_data_path
+#     if not output_path:
+#         save_path =  os.path.join(data_dir, f'{exp_name}.pkl')
+#         update_yaml(os.path.join(exp_config_dir, os.path.basename(data_cfg_path)), 'dataset.output_path', save_path)
         
-    else:
-        save_path = output_path
+#     else:
+#         save_path = output_path
          
-    save_dataset(dataset, save_path)
+#     save_dataset(dataset, save_path)
 
-    show_dataset_examples(dataset)
+#     show_dataset_examples(dataset)
 
     # shutil.copy(data_cfg_path, exp_config_dir)
     
