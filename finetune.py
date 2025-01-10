@@ -271,11 +271,15 @@ def main():
     else:
         train_ds = dataset['train']
         val_ds = test_ds = train_ds
+
+    if train_args.val_n_samples:
+        val_ds = val_ds.shuffle(seed=exp_args.seed).select(range(train_args.val_n_samples))
+
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
-        eval_dataset=val_ds.select(range(5)),
+        eval_dataset=val_ds,
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         data_collator=data_collator,

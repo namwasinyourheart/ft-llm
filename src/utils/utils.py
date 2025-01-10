@@ -1,5 +1,31 @@
 # %%writefile ./utils/utils.py
 
+import json
+
+def read_json(file_path):
+    """
+    Reads a JSON file and returns the data as a Python object.
+
+    :param file_path: Path to the JSON file
+    :return: Parsed data from the JSON file
+    """
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+    return data
+
+# Example usage
+# data = read_json('data.json')
+# print(data)
+
+
+
+
+
+
+
+
+
+
 import os
 import yaml
 from omegaconf import OmegaConf

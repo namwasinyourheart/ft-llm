@@ -64,16 +64,10 @@ def get_model_tokenizer(
 
 
 from transformers import BitsAndBytesConfig
-def get_quantization_config(load_in_4bit: bool=False, 
-                            load_in_8bit: bool=False,
-                            bnb_4bit_compute_dtype=None,
-                            bnb_4bit_quant_type: str="nf4",
-                            bnb_4bit_use_double_quant: bool=False,
-                            bnb_4bit_quant_storage: str="uint8"
-                            
-                            
+
+def get_quantization_config(model_args                          
 ) -> BitsAndBytesConfig | None:
-    if load_in_4bit:
+    if model_args.load_in_4bit:
         # compute_dtype = torch.float16
         # if torch_dtype not in {"auto", None}:
         #     compute_dtype = getattr(torch, model_args.torch_dtype)
@@ -81,12 +75,12 @@ def get_quantization_config(load_in_4bit: bool=False,
 
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
-            bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
-            bnb_4bit_quant_type=bnb_4bit_quant_type,
-            bnb_4bit_use_double_quant=bnb_4bit_use_double_quant,
-            bnb_4bit_quant_storage=bnb_4bit_quant_storage,
+            bnb_4bit_compute_dtype=model_args.bnb_4bit_compute_dtype,
+            bnb_4bit_quant_type=model_args.bnb_4bit_quant_type,
+            bnb_4bit_use_double_quant=model_args.bnb_4bit_use_double_quant,
+            bnb_4bit_quant_storage=model_args.bnb_4bit_quant_storage,
         ).to_dict()
-    elif load_in_8bit:
+    elif model_args.load_in_8bit:
         quantization_config = BitsAndBytesConfig(
             load_in_8bit=True,
         ).to_dict()
@@ -94,6 +88,36 @@ def get_quantization_config(load_in_4bit: bool=False,
         quantization_config = None
 
     return quantization_config
+# def get_quantization_config(load_in_4bit: bool=False, 
+#                             load_in_8bit: bool=False,
+#                             bnb_4bit_compute_dtype=None,
+#                             bnb_4bit_quant_type: str="nf4",
+#                             bnb_4bit_use_double_quant: bool=False,
+#                             bnb_4bit_quant_storage: str="uint8"
+                            
+                            
+# ) -> BitsAndBytesConfig | None:
+#     if load_in_4bit:
+#         # compute_dtype = torch.float16
+#         # if torch_dtype not in {"auto", None}:
+#         #     compute_dtype = getattr(torch, model_args.torch_dtype)
+        
+
+#         quantization_config = BitsAndBytesConfig(
+#             load_in_4bit=True,
+#             bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
+#             bnb_4bit_quant_type=bnb_4bit_quant_type,
+#             bnb_4bit_use_double_quant=bnb_4bit_use_double_quant,
+#             bnb_4bit_quant_storage=bnb_4bit_quant_storage,
+#         ).to_dict()
+#     elif load_in_8bit:
+#         quantization_config = BitsAndBytesConfig(
+#             load_in_8bit=True,
+#         ).to_dict()
+#     else:
+#         quantization_config = None
+
+#     return quantization_config
 
 import torch
 def set_torch_dtype_and_attn_implementation():
