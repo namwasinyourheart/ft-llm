@@ -337,6 +337,16 @@ def main():
         trainer.model.save_pretrained(os.path.join(results_dir, 'adapter'))
         logger.info(f"Model saved to {os.path.join(results_dir, 'adapter')}")
 
+
+    # EVALUATION
+    if training_args.do_eval:
+        logger.info("EVALUATING...")
+        metrics = trainer.evaluate(metric_key_prefix="eval")
+        trainer.log_metrics("eval", metrics)
+        trainer.save_metrics("eval", metrics)
+        all_metrics.update(metrics)
+
+
     import pandas as pd
     # PREDICTION
     if training_args.do_predict:
