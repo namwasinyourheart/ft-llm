@@ -149,16 +149,23 @@ def generate_response(question, tokenizer, model, **generate_kwargs):
     return answer
 
 if __name__ == "__main__":
-    tokenizer_name_or_path = 'exps/it__qwen2.5-0.5b-instruct__cmc_global_qa_480/results/tokenizer'
-    tokenizer = load_tokenizer_for_generate(tokenizer_name_or_path)
-    # print(tokenizer)
+    # tokenizer_name_or_path = 'exps/it__qwen2.5-0.5b-instruct__cmc_global_qa_480/results/tokenizer'
+    # tokenizer = load_tokenizer_for_generate(tokenizer_name_or_path)
+    # # print(tokenizer)
 
-    pretrained_model_name_or_path = 'exps/it__qwen2.5-0.5b-instruct__cmc_global_qa_480/results/finetuned_model'
-    model = load_model_for_generate(pretrained_model_name_or_path)
+    # pretrained_model_name_or_path = 'exps/it__qwen2.5-0.5b-instruct__cmc_global_qa_480/results/finetuned_model'
+    # model = load_model_for_generate(pretrained_model_name_or_path)
     # print(model)
 
     import argparse
     parser = argparse.ArgumentParser(description='Generate an answer for a given question.')
+
+    parser.add_argument(
+        '--model_name_or_path',
+        type=str,
+        required=True,
+        help='The path to model.'
+    )
     parser.add_argument(
         '--question',
         type=str,
@@ -174,5 +181,8 @@ if __name__ == "__main__":
         'response_key': '### Answer:',
         'end_key': '<|im_end|>'
     }
+
+    model_name_or_path = args.model_name_or_path
+    model, tokenizer = load_model_tokenizer_for_generate(model_name_or_path)
     result = generate_response(args.question, tokenizer, model, **generate_kwargs)
     print("Answer:", result)
