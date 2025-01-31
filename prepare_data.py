@@ -188,7 +188,8 @@ def get_data_collator():
 def prepare_data(exp_args, data_args, model_args):
 
     if data_args.dataset.is_dataset_dict:
-        dataset_dict = load_dataset(data_args.dataset.data_path)
+        dataset_dict = load_dataset(data_args.dataset.data_path,
+                                    trust_remote_code=True)
     
     else:    
         dataset_dict = create_dataset_dict(data_args.dataset.data_path, 
