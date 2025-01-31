@@ -100,8 +100,6 @@ def main():
     except Exception as e:
         raise RuntimeError(f"Failed to load configuration from {config_path}: {e}")
 
-    # Print the configuration for debugging
-    # print("type(cfg):", type(cfg))
     print(OmegaConf.to_yaml(cfg))
 
     assert os.path.basename(config_path).replace('.yaml', '') == cfg.exp_manager.exp_name
@@ -123,7 +121,7 @@ def main():
 
     if data_args.dataset.is_prepared:
         # Get the path to the processed data
-        processed_data_path = os.path.normpath(data_args.dataset.output_path)
+        processed_data_path = os.path.normpath(data_args.dataset.prepared_data_path)
         
         # Check if the processed data exists
         if not os.path.isfile(processed_data_path):
@@ -150,6 +148,9 @@ def main():
     logger.info("LOADING MODEL AND TOKENIZER...")
     model, tokenizer = get_model_tokenizer(data_args, model_args, use_cpu=True)
 
+    # logger.info("Tokenizer:")
+    # logger.info(tokenizer)
+
     # print(model.config)
     # print(tokenizer)
 
@@ -159,20 +160,6 @@ def main():
         import numpy as np
         import nltk
         from nltk.translate.bleu_score import sentence_bleu
-        # squad_labels = pred.label_ids
-        # squad_preds = pred.predictions.argmax(-1)
-    
-        # # Calculate Exact Match (EM)
-        # em = sum([1 if p == l else 0 for p, l in zip(squad_preds, squad_labels)]) / len(squad_labels)
-    
-        # # Calculate F1-score
-        # f1 = f1_score(squad_labels, squad_preds, average='macro')
-        
-        # references = pred.label_ids
-        # generated_texts = pred.predictions
-    
-        # print("references:", references)
-        # print("generated_texts:", generated_texts)
     
         label_ids = predictions.label_ids
         label_ids = np.where(label_ids != -100, label_ids, tokenizer.pad_token_id)
@@ -264,16 +251,32 @@ def main():
     )
 
     # Initialize our Trainer
-    logger.info("Instantiating Trainer")
-    # print("Instantiating Trainer")
+    # logger.info("Instantiating Trainer")
+
     if data_args.dataset.do_split:
         train_ds, val_ds, test_ds = dataset['train'], dataset['val'], dataset['test']
     else:
         train_ds = dataset['train']
         val_ds = test_ds = train_ds
 
+    def get_data_subset(n_samples, dataset, seed):
+        if n_samples == -1:
+            subset = dataset
+        else:
+            subset = dataset.shuffle(seed=seed)
+            subset = subset.select(range(n_samples))
+
+        return subset
+
+    if train_args.train_n_samples:
+        # train_ds = train_ds.shuffle(seed=exp_args.seed).select(range(train_args.train_n_samples))
+        train_ds = get_data_subset(train_args.train_n_samples, train_ds, exp_args.seed)
+
     if train_args.val_n_samples:
-        val_ds = val_ds.shuffle(seed=exp_args.seed).select(range(train_args.val_n_samples))
+        val_ds = get_data_subset(train_args.val_n_samples, val_ds, exp_args.seed)
+
+    if train_args.test_n_samples:
+        test_ds = get_data_subset(train_args.test_n_samples, test_ds, exp_args.seed)
 
     trainer = SFTTrainer(
         model=model,
@@ -299,9 +302,9 @@ def main():
         freq=1,
     )
 
-    # Add the callback to the trainer
-    trainer.add_callback(progress_callback)
-    logger.info('trainer_callback_list: %s', trainer.callback_handler.callbacks)
+    # # Add the callback to the trainer
+    # trainer.add_callback(progress_callback)
+    # logger.info('trainer_callback_list: %s', trainer.callback_handler.callbacks)
 
     all_metrics = {"run_name": wandb.run.name}
 
@@ -314,6 +317,10 @@ def main():
     #  TRAINING
     if training_args.do_train:
         logger.info("TRAINING...")
+        
+        # Add the callback to the trainer
+        trainer.add_callback(progress_callback)
+        logger.info('trainer_callback_list: %s', trainer.callback_handler.callbacks)
 
         if training_args.resume_from_checkpoint:
             checkpoint = training_args.resume_from_checkpoint
@@ -329,23 +336,22 @@ def main():
         trainer.save_state()
 
         all_metrics.update(metrics)
-        # print(metrics)
 
-        # trainer.log_metrics("train", metrics)
-        # trainer.save_metrics("train", metrics)
-        # trainer.save_state()
-        # all_metrics.update(metrics)
 
         # Save model
         logger.info("SAVING MODEL...")
         trainer.model.save_pretrained(os.path.join(results_dir, 'adapter'))
         logger.info(f"Model saved to {os.path.join(results_dir, 'adapter')}")
 
+        logger.info("TRAINING COMPLETED.")
+
 
     # EVALUATION
     if training_args.do_eval:
         logger.info("EVALUATING...")
-        metrics = trainer.evaluate(metric_key_prefix="eval")
+        metrics = trainer.evaluate(
+            eval_dataset=val_ds, 
+            metric_key_prefix="eval")
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
         all_metrics.update(metrics)
@@ -355,11 +361,18 @@ def main():
     # PREDICTION
     if training_args.do_predict:
         logger.info("PREDICTING...")
-        predictions = trainer.predict(test_ds.select(range(2)))
+        predictions = trainer.predict(
+            test_dataset=test_ds,
+            metric_key_prefix='test'
+        )
+        metrics = predictions.metrics
+        all_metrics.update(metrics)
+        
+        # logger.info(f'predictions: {predictions}')
         # print("DECODING PREDICTION...")
         predictions = decode_predictions(tokenizer, predictions)
         predictions_df = pd.DataFrame(predictions)
-        predictions_df.to_csv(os.path.join(results_dir, 'predictions_df.csv'), index=False)
+        predictions_df.to_csv(os.path.join(results_dir, 'test_predictions.csv'), index=False)
     
     import json
     
@@ -367,10 +380,10 @@ def main():
             with open(os.path.join(results_dir, "metrics.json"), "w") as fout:
                 fout.write(json.dumps(all_metrics))
 
-    logger.info("TRAINING COMPLETED.")
+    
 
     # Merge model
-    if model_args.do_merge == True:
+    if training_args.do_train == True and model_args.do_merge == True:
         logger.info("MERGING MODEL...")
         # adapter_dir = os.path.join(exp_dir, 'results')
         # os.makedirs(adapter_dir, exist_ok=True)
@@ -385,7 +398,6 @@ def main():
         
         # Save merged model
         finetuned_model.save_pretrained(os.path.join(results_dir, 'finetuned_model_tokenizer'))
-
 
         # Save tokenizer
         tokenizer.save_pretrained(os.path.join(results_dir, 'finetuned_model_tokenizer'))
