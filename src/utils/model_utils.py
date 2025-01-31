@@ -7,11 +7,10 @@ import logging
 def load_tokenizer(data_args, model_args,
                   # padding_side
 ) -> PreTrainedTokenizer:
-    # logging.info("Loading tokenizer")
     tokenizer =  AutoTokenizer.from_pretrained(model_args.pretrained_model_name_or_path)
-
     if not tokenizer.pad_token:
-        if data_args.new_pad_token:
+        
+        if data_args.tokenizer.new_pad_token:
             tokenizer.padding_side = 'left'
             tokenizer.pad_token = data_args.tokenizer.new_pad_token,
             tokenizer.add_special_tokens({"pad_token": data_args.tokenizer.new_pad_token})
@@ -88,36 +87,7 @@ def get_quantization_config(model_args
         quantization_config = None
 
     return quantization_config
-# def get_quantization_config(load_in_4bit: bool=False, 
-#                             load_in_8bit: bool=False,
-#                             bnb_4bit_compute_dtype=None,
-#                             bnb_4bit_quant_type: str="nf4",
-#                             bnb_4bit_use_double_quant: bool=False,
-#                             bnb_4bit_quant_storage: str="uint8"
-                            
-                            
-# ) -> BitsAndBytesConfig | None:
-#     if load_in_4bit:
-#         # compute_dtype = torch.float16
-#         # if torch_dtype not in {"auto", None}:
-#         #     compute_dtype = getattr(torch, model_args.torch_dtype)
-        
 
-#         quantization_config = BitsAndBytesConfig(
-#             load_in_4bit=True,
-#             bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
-#             bnb_4bit_quant_type=bnb_4bit_quant_type,
-#             bnb_4bit_use_double_quant=bnb_4bit_use_double_quant,
-#             bnb_4bit_quant_storage=bnb_4bit_quant_storage,
-#         ).to_dict()
-#     elif load_in_8bit:
-#         quantization_config = BitsAndBytesConfig(
-#             load_in_8bit=True,
-#         ).to_dict()
-#     else:
-#         quantization_config = None
-
-#     return quantization_config
 
 import torch
 def set_torch_dtype_and_attn_implementation():
