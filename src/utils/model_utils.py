@@ -17,15 +17,20 @@ def load_tokenizer(data_args, model_args,
         else:
             tokenizer.padding_side = 'right'
             tokenizer.pad_token = tokenizer.eos_token
-
-    tokenizer.add_special_tokens({
-        "additional_special_tokens": [
-            data_args.prompt.instruction_key, 
-            data_args.prompt.input_key, 
-            data_args.prompt.response_key
-        ]
-    })
-            
+    
+    additional_special_tokens = [
+        data_args.prompt.instruction_key, 
+        data_args.prompt.input_key,  
+        data_args.prompt.response_key
+    ]
+    if data_args.prompt.context_key:
+        additional_special_tokens = additional_special_tokens.append(data_args.prompt.context_key)
+    
+    if data_args.tokenizer.add_special_tokens:
+        tokenizer.add_special_tokens({
+            "additional_special_tokens": additional_special_tokens
+        })
+                
     return tokenizer
 
 def load_model(model_args, use_cpu: bool=False) -> AutoModelForCausalLM:

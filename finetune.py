@@ -228,7 +228,7 @@ def main():
     # if exp_args.wandb.use_wandb:
     wandb.init(
         project=cfg.exp_manager.wandb.project,
-        name = cfg.exp_manager.exp_name
+        # name = cfg.exp_manager.exp_name
     )
 
     current_date = time.strftime("%Y%m%d_%H%M%S")

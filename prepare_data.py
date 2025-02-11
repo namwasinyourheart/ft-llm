@@ -122,8 +122,12 @@ def create_prompt_formats(example,
                           use_model_chat_template,
                           input_col: str="question",
                           output_col: str="answer",
-                          instruction_key: str = "### Instruction:",
-                          instruction_text: str = "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
+                          context_col: str="context",
+                          
+                          instruction_key: str="### Instruction:",
+                          instruction_text: str="You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
+
+                          context_key: str="### Context:",
                           input_key: str = "### Question:",
                           response_key: str = "### Answer:",
                           end_key = None,
@@ -131,6 +135,9 @@ def create_prompt_formats(example,
                           max_length = None, 
 ):
     instruction = f'{instruction_key}\n{instruction_text}'
+    if context_col:
+        context = f'{context_key}\n{example[context_col]}'
+
     input = f'{input_key}\n{example[input_col]}'
 
     response = f'{response_key}\n{example[output_col]}'
@@ -141,10 +148,13 @@ def create_prompt_formats(example,
     end = f'{end_key}'
     
     if not use_model_chat_template:  # Not using default model chat template
-        parts = [part for part in [instruction, input, response] if part]
+        parts = [part for part in [instruction, context, input, response] if part]
         formatted_prompt = "\n\n".join(parts)
     else:   # Using defaut model chat template
         if has_system_role_support(tokenizer):
+
+            if context_col:
+                input = f'{context}\n{input}'
             messages = [
                 {"role": "system", "content": instruction},
                 {"role": "user", "content": input},
@@ -153,8 +163,10 @@ def create_prompt_formats(example,
             formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
 
         else:
+            if context_col:
+                input = f'{context}\n{input}'
             messages = [
-                {"role": "user", "content": instruction+ '\n' +input},
+                {"role": "user", "content": instruction + '\n' + input},
                 {"role": "assistant", "content": response},
             ]
             formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
@@ -206,10 +218,15 @@ def prepare_data(exp_args, data_args, model_args):
           use_model_chat_template = data_args.prompt.use_model_chat_template,
           input_col = data_args.dataset.input_col,
           output_col = data_args.dataset.output_col,
+          context_col = data_args.dataset.context_col,
+          
           instruction_key = data_args.prompt.instruction_key, # "### Instruction:",
           instruction_text = data_args.prompt.instruction_text, # "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
+          
+          context_key =  data_args.prompt.context_key,
           input_key = data_args.prompt.input_key, #"### Question:",
           response_key = data_args.prompt.response_key, #"### Answer:",
+          
           end_key = data_args.prompt.end_key,
           do_tokenize = data_args.tokenizer.do_tokenize, 
           max_length = data_args.tokenizer.max_length
@@ -312,7 +329,7 @@ def main():
 
     if data_args.dataset.is_prepared:
         # Get the path to the processed data
-        processed_data_path = os.path.normpath(data_args.dataset.output_path)
+        processed_data_path = os.path.normpath(data_args.dataset.prepared_data_path)
         
         # Check if the processed data exists
         if not os.path.isfile(processed_data_path):
