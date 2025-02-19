@@ -45,6 +45,7 @@ def load_model(model_args, use_cpu: bool=False) -> AutoModelForCausalLM:
     model = AutoModelForCausalLM.from_pretrained(
         model_args.pretrained_model_name_or_path,
         trust_remote_code=True,
+        torch_dtype=torch_dtype,
         quantization_config=quantization_config if not use_cpu else None,
         device_map="cpu" if use_cpu else "auto",
         attn_implementation=attn_implementation,
@@ -71,15 +72,18 @@ from transformers import BitsAndBytesConfig
 
 def get_quantization_config(model_args                          
 ) -> BitsAndBytesConfig | None:
+    torch_dtype, attn_implementation = set_torch_dtype_and_attn_implementation()
+    
     if model_args.load_in_4bit:
         # compute_dtype = torch.float16
         # if torch_dtype not in {"auto", None}:
         #     compute_dtype = getattr(torch, model_args.torch_dtype)
         
+        
 
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
-            bnb_4bit_compute_dtype=model_args.bnb_4bit_compute_dtype,
+            bnb_4bit_compute_dtype=torch_dtype, #model_args.bnb_4bit_compute_dtype,
             bnb_4bit_quant_type=model_args.bnb_4bit_quant_type,
             bnb_4bit_use_double_quant=model_args.bnb_4bit_use_double_quant,
             bnb_4bit_quant_storage=model_args.bnb_4bit_quant_storage,
