@@ -1,4 +1,3 @@
-%%writefile prepare_data.py
 import os
 import shutil
 import joblib
