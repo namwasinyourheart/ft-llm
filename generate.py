@@ -142,7 +142,7 @@ def postprocess(
     return decoded
 
 
-def generate_response(use_cpu: bool=False, return_full_text=False, do_postprocess=True, **generate_kwargs):
+def generate_response(use_cpu: bool=False, **generate_kwargs):
     model = load_model_for_generate(use_cpu=use_cpu, **generate_kwargs)
     # print(model.config)
     tokenizer = load_tokenizer_for_generate(**generate_kwargs)
@@ -170,10 +170,10 @@ def generate_response(use_cpu: bool=False, return_full_text=False, do_postproces
     output = tokenizer.decode(output_ids[0], 
                               skip_special_tokens=generate_kwargs['skip_special_tokens'])
     # print('answer:', answer)
-    if do_postprocess:
+    if generate_kwargs['do_postprocess']:
         # outputs = [postprocess(prompt, tokenizer, output, return_full_text, **generate_kwargs) for (prompt, output) in zip(prompts, outputs)]
 
-        output = postprocess(prompt, tokenizer, output, return_full_text, **generate_kwargs)
+        output = postprocess(prompt, tokenizer, output, generate_kwargs['return_full'], **generate_kwargs)
     
     return output
 
@@ -212,5 +212,5 @@ if __name__ == "__main__":
 
     kwargs = {**model_kwargs, **prompt_kwargs, **generate_kwargs}
 
-    result = generate_response(use_cpu=False, return_full_text=True, do_postprocess=False, **kwargs)
+    result = generate_response(use_cpu=False, **kwargs)
     print(result)
