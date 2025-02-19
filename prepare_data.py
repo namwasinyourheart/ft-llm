@@ -1,3 +1,4 @@
+%%writefile prepare_data.py
 import os
 import shutil
 import joblib
@@ -135,8 +136,9 @@ def create_prompt_formats(example,
                           max_length = None, 
 ):
     instruction = f'{instruction_key}\n{instruction_text}'
-    if context_col:
-        context = f'{context_key}\n{example[context_col]}'
+    
+    context = f'{context_key}\n{example[context_col]}' if context_col else None
+
 
     input = f'{input_key}\n{example[input_col]}'
 
