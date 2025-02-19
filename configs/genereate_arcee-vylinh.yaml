@@ -1,0 +1,34 @@
+model:
+  pretrained_model_name_or_path: "arcee-ai/Arcee-VyLinh"
+  tokenizer_name_or_path: "arcee-ai/Arcee-VyLinh"
+  load_in_4bit: false
+  load_in_8bit: false
+  bnb_4bit_compute_dtype: null
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: false
+  bnb_4bit_quant_storage: "uint8"
+
+prompt:
+  use_no_keys: false
+  use_examples: false
+  use_context: false
+
+  instruction_key: "### Instruction:"
+  instruction_text: "Bạn là chuyên gia giải toán. Giải bài toán sau. Lời giải của bạn nên chứa 2 phần: Explanation và Answer. Phần Explanation trình bày cách thực hiện lời giải. Phần Answer chỉ chứa số như câu trả lời và không chứa bất kỳ kí tự nào khác. "
+
+  context_key: null
+  context_text: null
+
+  examples_key: "### Examples:"
+  examples_text: null
+  input_key: "### Question:"
+  input_text: "Jasper sẽ phục vụ món thịt nguội tại bữa tiệc của mình. Anh ấy mua 2 pound phô mai cheddar với giá $10, 1 pound phô mai kem với giá bằng một nửa giá phô mai cheddar và một gói thịt nguội với giá gấp đôi giá phô mai cheddar. Anh ấy đã chi bao nhiêu tiền cho các nguyên liệu này?"
+
+  response_key: "### Explanation:"
+  end_key: null
+
+generate:
+  max_new_tokens: 512
+  skip_special_tokens: true
+  temperature: null
+  do_sample: null
