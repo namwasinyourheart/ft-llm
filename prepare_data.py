@@ -260,11 +260,10 @@ def main():
     
     from src.utils.utils import load_args
 
-    from src.utils.log_utils import init_logging, setup_logger
+    from src.utils.log_utils import setup_logger
     from src.utils.exp_utils import create_exp_dir
 
     # Setup logging
-    # init_logging()
     logger = setup_logger("ft_llm")
 
     # Setup environment
