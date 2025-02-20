@@ -19,7 +19,7 @@ from prepare_data import show_dataset_examples
 from dotenv import load_dotenv
 
 from src.utils.model_utils import get_model_tokenizer, get_peft_config
-from src.utils.log_utils import init_logging, setup_logger
+from src.utils.log_utils import setup_logger
 from src.utils.exp_utils import create_exp_dir
 
 from peft import (
@@ -42,13 +42,6 @@ def to_linux_path(path):
     """Convert a given path to Linux-style with forward slashes."""
     return path.replace("\\", "/")
 
-# def init_logging() -> None:
-#     """Initialize logging."""
-#     logging.basicConfig(
-#         format="%(asctime)s %(levelname)s: %(message)s",
-#         level=logging.INFO,
-#         datefmt="%Y-%m-%d %H:%M:%S",
-#     )
 
 def setup_environment() -> None:
     # print("SETTING UP ENVIRONMENT...")
@@ -57,7 +50,6 @@ def setup_environment() -> None:
 def main():
 
     # Setup logging
-    # init_logging()
     logger = setup_logger("ft_llm")
 
     # Setup environment
