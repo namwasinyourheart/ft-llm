@@ -2,15 +2,10 @@ import os
 import shutil
 import joblib
 import argparse
-import yaml
-from typing import Tuple
-import logging
-
 from functools import partial
 
 from datasets import load_dataset
 
-from src.utils.utils import load_args, update_yaml
 from src.utils.model_utils import load_tokenizer
 
 
@@ -90,7 +85,7 @@ def show_dataset_examples(dataset_dict):
         for key, value in example.items():
             print(f"  {key}: {value}")
 
-    print("\n" + "=" * 40 + "\n")
+    print("-" * 24 + "\n")
 
 
 def has_system_role_support(tokenizer):
@@ -184,7 +179,9 @@ def create_prompt_formats(example,
                                    truncation=True, 
                                    padding='max_length', 
                                    add_special_tokens=True, 
-                                   max_length=max_length)
+                                   max_length=max_length,
+                                   return_tensors='pt'
+                                   )
         
         example['input_ids'] = tokenized_text['input_ids']
         example['attention_mask'] = tokenized_text['attention_mask']
