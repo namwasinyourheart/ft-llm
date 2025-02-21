@@ -165,39 +165,6 @@ def get_peft_config(model_args) -> PeftConfig | None:
 
     return peft_config
 
-
-# def get_peft_config(r, 
-#                     lora_alpha, 
-#                     target_modules, 
-#                     lora_dropout, 
-#                     bias, 
-#                     task_type
-# ):
-#     """
-#     Create Parameter-Efficient Fine-Tuning (PEFT) configuration for the model.
-
-#     Args:
-#         r (int): LoRA attention dimension.
-#         lora_alpha (float): Alpha parameter for LoRA scaling.
-#         target_modules (list): Names of the modules to apply LoRA to.
-#         lora_dropout (float): Dropout probability for LoRA layers.
-#         bias (str): Specifies if the bias parameters should be trained.
-#         task_type (str): Type of task for PEFT (e.g., "CAUSAL_LM").
-
-#     Returns:
-#         LoraConfig: Configured LoRA settings for fine-tuning.
-#     """
-#     config = LoraConfig(
-#         r=r,
-#         lora_alpha=lora_alpha,
-#         target_modules=target_modules,
-#         lora_dropout=lora_dropout,
-#         bias=bias,
-#         task_type=task_type,
-#     )
-#     return config
-
-
 # https://github.com/huggingface/trl/blob/main/examples/research_projects/stack_llama/scripts/supervised_finetuning.py
 def print_trainable_parameters(model):
     """
