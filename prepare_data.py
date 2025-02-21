@@ -1,3 +1,4 @@
+# %%writefile prepare_data.py
 import os
 import shutil
 import joblib
@@ -9,14 +10,81 @@ from datasets import load_dataset
 from src.utils.model_utils import load_tokenizer
 
 
-def load_template(template_file):
-    """Load the template from a text file."""
-    with open(template_file, 'r') as file:
-        return file.read()
 
+import os
+import argparse
+import joblib
+
+
+from dotenv import load_dotenv
+
+from hydra import initialize, compose
+from hydra.utils import instantiate
+from omegaconf import OmegaConf
+
+from transformers import TrainingArguments, Trainer, DataCollatorWithPadding, set_seed
+from src.utils.model_utils import load_tokenizer, load_model
+
+# from prepare_data import prepare_data, show_dataset_examples
+
+
+from src.utils.log_utils import setup_logger
+from src.utils.exp_utils import setup_environment, create_exp_dir
 
 import pandas as pd
 from datasets import Dataset, DatasetDict
+
+
+import warnings
+warnings.filterwarnings("ignore")
+
+
+
+
+def load_cfg(config_path, override_args=None, print_cfg=True):
+
+    """
+    Load a configuration file using Hydra and OmegaConf.
+    
+    Args:
+        config_path (str): Path to the configuration file.
+        override_args (list, optional): List of arguments to override configuration values.
+
+    Returns:
+        cfg: Loaded configuration object.
+    """
+
+    override_args = override_args or []
+    config_path = os.path.normpath(config_path)
+    
+    if not os.path.isfile(config_path):
+        raise FileNotFoundError(f"Configuration file not found at: {config_path}")
+    
+    config_dir = os.path.dirname(config_path)
+    config_fn = os.path.splitext(os.path.basename(config_path))[0]
+    
+    try:
+        with initialize(version_base=None, config_path=config_dir):
+            cfg = compose(config_name=config_fn, overrides=override_args)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load configuration from {config_path}: {e}")
+    
+    # assert os.path.basename(config_path).replace('.yaml', '') == cfg.exp_manager.exp_name, \
+    # assert cfg.exp_manager.phase_name + '__' + 
+    assert cfg.exp_manager.exp_name == os.path.basename(config_path).replace('.yaml', ''), \
+    f"Config file name '{os.path.basename(config_path)}' does not match experiment name '{cfg.exp_manager.exp_name}' in the config."
+
+    if print_cfg:
+        print(OmegaConf.to_yaml(cfg))
+    
+    exp_args = cfg.exp_manager
+    data_args = cfg.prepare_data
+    model_args = cfg.prepare_model
+    train_args = cfg.train
+    eval_args = cfg.eval
+    gen_args = cfg.generate
+
+    return cfg, exp_args, data_args, model_args, train_args, eval_args, gen_args
 
 def create_dataset_dict(data_path, 
                         do_split: bool=True, 
@@ -118,25 +186,51 @@ def create_prompt_formats(example,
                           input_col: str="question",
                           output_col: str="answer",
                           context_col: str="context",
-                          
-                          instruction_key: str="### Instruction:",
-                          instruction_text: str="You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
 
+                          use_no_keys: str=False,
+                          use_examples: str=False,
+                          use_context: str=False,
+                          
+                          intro_text: str="You are a knowledgeable assistant for the company CMC Global.",
+                          instruction_key: str="### Instruction:",
+                          instruction_text: str="Your task is to providing accurate and helpful answers to the user's questions about the company.",
+
+                          examples_key: str="### Examples:",
+                          examples_template: str="",
+                          examples_list: list=[],
+                          
                           context_key: str="### Context:",
                           input_key: str = "### Question:",
                           response_key: str = "### Answer:",
                           end_key = None,
+                          
                           do_tokenize = False, 
                           max_length = None, 
+                          phase_name='eval'
 ):
-    instruction = f'{instruction_key}\n{instruction_text}'
+    if use_no_keys:
+        return f'{example[input_col]}'
     
-    context = f'{context_key}\n{example[context_col]}' if context_col else None
+    intro = f'{intro_text}'
+    instruction = f'{instruction_key}\n{instruction_text}'
 
+    examples = None
+    if use_examples:
+        example_template = examples_template
+        formatted_examples = "\n\n".join(
+            example_template.format(**example) for example in examples_list
+        )
+        examples = f"{examples_key}\n{formatted_examples}"
+    
+    context = f'{context_key}\n{example[context_col]}' if (use_context and context_col) else None
 
     input = f'{input_key}\n{example[input_col]}'
 
-    response = f'{response_key}\n{example[output_col]}'
+    if phase_name == 'train':
+        response = f'{response_key}\n{example[output_col]}'
+    
+    elif phase_name == 'eval':
+        response = f'{response_key}\n'
     
     if not end_key:
         end_key = tokenizer.eos_token
@@ -144,8 +238,9 @@ def create_prompt_formats(example,
     end = f'{end_key}'
     
     if not use_model_chat_template:  # Not using default model chat template
-        parts = [part for part in [instruction, context, input, response] if part]
+        parts = [part for part in [intro, instruction, examples, context, input, response] if part]
         formatted_prompt = "\n\n".join(parts)
+    
     else:   # Using defaut model chat template
         if has_system_role_support(tokenizer):
 
@@ -167,12 +262,17 @@ def create_prompt_formats(example,
             ]
             formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
 
-    if formatted_prompt.strip().endswith(end):
+    
+    if phase_name == 'train':
+        if formatted_prompt.strip().endswith(end):
+            example['text'] = formatted_prompt
+            # print('endswith end')
+        else:
+            # print('does not ends with end')
+            example['text'] = formatted_prompt + end
+    
+    elif phase_name == 'eval':
         example['text'] = formatted_prompt
-        # print('endswith end')
-    else:
-        # print('does not ends with end')
-        example['text'] = formatted_prompt + end
 
     if do_tokenize:
         tokenized_text = tokenizer(formatted_prompt, 
@@ -182,6 +282,7 @@ def create_prompt_formats(example,
                                    max_length=max_length,
                                    return_tensors='pt'
                                    )
+
         
         example['input_ids'] = tokenized_text['input_ids']
         example['attention_mask'] = tokenized_text['attention_mask']
@@ -207,6 +308,14 @@ def prepare_data(exp_args, data_args, model_args):
                                            data_args.dataset.val_ratio, 
                                            data_args.dataset.test_ratio, 
                                            exp_args.seed)
+        
+
+    if data_args.dataset.subset_ratio and 0 < data_args.dataset.subset_ratio < 1:
+        
+        dataset_dict = DatasetDict({
+            split: dataset_dict[split].shuffle(seed=exp_args.seed).select(range(int(len(dataset_dict[split]) * data_args.dataset.subset_ratio)))
+            for split in dataset_dict.keys()
+        }) 
     
     tokenizer = load_tokenizer(data_args, model_args)
 
@@ -217,23 +326,36 @@ def prepare_data(exp_args, data_args, model_args):
           input_col = data_args.dataset.input_col,
           output_col = data_args.dataset.output_col,
           context_col = data_args.dataset.context_col,
+
+          use_no_keys = data_args.prompt.use_no_keys,
+          use_examples = data_args.prompt.use_examples,
+          use_context = data_args.prompt.use_context,
+                          
           
+          intro_text = data_args.prompt.intro_text, 
           instruction_key = data_args.prompt.instruction_key, # "### Instruction:",
           instruction_text = data_args.prompt.instruction_text, # "You are a knowledgeable assistant for the company CMC Global. Your task is to providing accurate and helpful answers to the user's questions about the company.",
           
+          examples_key = data_args.prompt.examples_key,
+          examples_template = data_args.prompt.examples_template,
+          examples_list = data_args.prompt.examples_list,
+
           context_key =  data_args.prompt.context_key,
           input_key = data_args.prompt.input_key, #"### Question:",
           response_key = data_args.prompt.response_key, #"### Answer:",
-          
           end_key = data_args.prompt.end_key,
+
           do_tokenize = data_args.tokenizer.do_tokenize, 
-          max_length = data_args.tokenizer.max_length
+          max_length = data_args.tokenizer.max_length,
+          phase_name = exp_args.phase_name
     )
+
+    columns_to_remove = [col for col in dataset_dict['train'].column_names if col not in ['index', 'answer', 'text']]
 
     dataset = dataset_dict.map(
         _create_prompt_formats, 
          batched=False, 
-         remove_columns=dataset_dict['train'].column_names
+         remove_columns=columns_to_remove
     )
 
     if data_args.dataset.do_save:
@@ -243,33 +365,18 @@ def prepare_data(exp_args, data_args, model_args):
     return dataset, save_path
 
 
-def setup_environment() -> None:
-    from dotenv import load_dotenv
-    # print("SETTING UP ENVIRONMENT...")
-    _ = load_dotenv()
-
 def main():
 
-    from hydra import initialize, compose
-    from hydra.utils import instantiate
-    
-    from omegaconf import OmegaConf
-    
-    from src.utils.utils import load_args
-
-    from src.utils.log_utils import setup_logger
-    from src.utils.exp_utils import create_exp_dir
-
-    # Setup logging
-    logger = setup_logger("ft_llm")
+   # Setup logging
+    logger = setup_logger()
 
     # Setup environment
     logger.info("SETTING UP ENVIRONMENT...")
     setup_environment()
 
 
-    # Set up argument parser
-    parser = argparse.ArgumentParser(description='Process experiment configurations.')
+    # Parse arguments
+    parser = argparse.ArgumentParser(description='Load experiment configurations.')
     parser.add_argument(
         '--config_path',
         type=str,
@@ -277,51 +384,22 @@ def main():
         help='Path to the configuration file for the experiment.'
     )
 
-    # args = parser.parse_args()
-    args, override_args = parser.parse_known_args()  # Capture any extra positional arguments (overrides)
+    args, override_args = parser.parse_known_args()
 
-    logger.info("LOADING CONFIGS...")
-
-    # Normalize the provided config path
-    config_path = os.path.normpath(args.config_path)  # Normalize path for the current OS
-
-    # Check if the configuration file exists
-    if not os.path.isfile(config_path):
-        raise FileNotFoundError(f"Configuration file not found at: {config_path}")
-
-    # Extract directory and filename from the provided config path
-    config_dir = os.path.dirname(config_path)
-    config_fn = os.path.splitext(os.path.basename(config_path))[0]
-
-    # print(config_dir)
-    # print(config_fn)
-
-    try:
-        with initialize(version_base=None, config_path=config_dir):
-            # Compose the configuration with optional overrides
-            cfg = compose(config_name=config_fn, overrides=override_args)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load configuration from {config_path}: {e}")
-
-    # Print the configuration for debugging
-    # print("type(cfg):", type(cfg))
-    print(OmegaConf.to_yaml(cfg))
-
-    assert os.path.basename(config_path).replace('.yaml', '') == cfg.exp_manager.exp_name
+    # Load configuration
+    logger.info("LOADING CONFIGURATIONS...")
+    cfg, exp_args, data_args, model_args, train_args, eval_args, gen_args = load_cfg(config_path=args.config_path, override_args=override_args)
     
-    logger.info("CREATING EXP DIR...")
-    
+    # Create experiment directories
+    # logger.info("CREATING DIRECTORIES...")""
     exp_name = cfg.exp_manager.exp_name
-    # create_exp_dir(os.path.basename(config_path).replace('.yaml', ''))
-    exp_dir, configs_dir, data_dir, checkpoints_dir, results_dir  = create_exp_dir(exp_name)
+    (exp_dir, exp_data_dir, exp_checkpoints_dir, exp_results_dir) = create_exp_dir(exp_name)
 
     import shutil
-    shutil.copy(config_path, configs_dir)
+    shutil.copy(args.config_path, exp_dir)
 
-    exp_args = cfg.exp_manager
-    train_args = cfg.train
-    data_args = cfg.prepare_data
-    model_args = cfg.prepare_model
+    # Set seed
+    set_seed(exp_args.seed)
 
 
     if data_args.dataset.is_prepared:
@@ -338,7 +416,7 @@ def main():
     else:
         # Prepare dataset
         logger.info("PREPARING DATASET...")
-        from prepare_data import prepare_data
+
         dataset, processed_data_path = prepare_data(exp_args, data_args, model_args)
 
     # print(dataset)
